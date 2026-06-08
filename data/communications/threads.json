@@ -1,0 +1,51 @@
+[
+  {
+    "thread_id": "THREAD-001",
+    "claim_id": "CLM-2024-003",
+    "channel": "email",
+    "messages": [
+      {
+        "message_id": "MSG-001-001",
+        "timestamp": "2024-02-12T15:00:00Z",
+        "direction": "outbound",
+        "sender": "claims-system",
+        "subject": "Document Request: CLM-2024-003",
+        "body": "Dear Policyholder,\n\nWith reference to your claim CLM-2024-003, we require the following additional document to process your claim:\n\n1. Fire brigade report\n\nReason: Independent verification of the fire incident is required per our standard claims procedure.\n\nPlease submit the document within 15 days to avoid delay in claim processing.\n\nRegards,\nClaims Team",
+        "pii_redacted": true
+      },
+      {
+        "message_id": "MSG-001-002",
+        "timestamp": "2024-02-18T10:30:00Z",
+        "direction": "inbound",
+        "sender": "policyholder",
+        "subject": "Re: Document Request: CLM-2024-003",
+        "body": "Hello,\n\nPlease find attached the fire brigade report as requested. The report confirms the fire started due to an electrical short circuit.\n\nPlease process my claim at the earliest.\n\nRegards",
+        "pii_redacted": true,
+        "attachments": ["fire_brigade_report_CLM2024003.pdf"]
+      }
+    ]
+  },
+  {
+    "thread_id": "THREAD-002",
+    "claim_id": "CLM-2024-005",
+    "channel": "sms",
+    "messages": [
+      {
+        "message_id": "MSG-002-001",
+        "timestamp": "2024-03-29T09:15:00Z",
+        "direction": "outbound",
+        "sender": "claims-system",
+        "body": "Your claim CLM-2024-005 has been registered. Claim Reference: CLM-2024-005. We will contact you within 48 hours. For queries call 1800-XXX-XXXX.",
+        "pii_redacted": true
+      },
+      {
+        "message_id": "MSG-002-002",
+        "timestamp": "2024-03-29T09:20:00Z",
+        "direction": "outbound",
+        "sender": "claims-system",
+        "body": "For theft claim CLM-2024-005: Please submit (1) Original FIR (2) All vehicle keys (3) RC copy to your nearest branch or upload on portal within 7 days.",
+        "pii_redacted": true
+      }
+    ]
+  }
+]
