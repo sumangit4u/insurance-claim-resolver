@@ -1,0 +1,144 @@
+{
+  "CLM-2024-001": {
+    "claim_id": "CLM-2024-001",
+    "policy_number": "POL-MOTOR-001",
+    "claim_type": "motor",
+    "status": "INTAKE",
+    "claimed_amount": 180000,
+    "incident_date": "2024-03-15",
+    "policy_start_date": "2024-01-01",
+    "incident_description": "Vehicle rear-ended at traffic signal. Damage to bumper and boot.",
+    "hitl_required": false,
+    "fraud_score": null,
+    "policy_citations": [],
+    "audit_trail": [],
+    "document_requests": []
+  },
+  "CLM-2024-002": {
+    "claim_id": "CLM-2024-002",
+    "policy_number": "POL-HEALTH-002",
+    "claim_type": "health",
+    "status": "TRIAGE",
+    "claimed_amount": 95000,
+    "incident_date": "2024-03-20",
+    "policy_start_date": "2023-06-01",
+    "incident_description": "Hospitalisation for appendectomy. 3 days ICU, 2 days general ward.",
+    "hitl_required": false,
+    "fraud_score": null,
+    "policy_citations": [],
+    "audit_trail": [
+      {
+        "from": "INTAKE",
+        "to": "TRIAGE",
+        "reason": "Claim documents received. Moving to triage.",
+        "timestamp": "2024-03-21T09:00:00Z"
+      }
+    ],
+    "document_requests": []
+  },
+  "CLM-2024-003": {
+    "claim_id": "CLM-2024-003",
+    "policy_number": "POL-PROP-003",
+    "claim_type": "property",
+    "status": "FRAUD_REVIEW",
+    "claimed_amount": 1200000,
+    "incident_date": "2024-02-10",
+    "policy_start_date": "2024-01-25",
+    "incident_description": "Fire damage to commercial premises. Total loss of inventory claimed.",
+    "hitl_required": true,
+    "fraud_score": 0.82,
+    "policy_citations": [],
+    "audit_trail": [
+      {
+        "from": "INTAKE", "to": "TRIAGE",
+        "reason": "Initial intake complete.", "timestamp": "2024-02-11T10:00:00Z"
+      },
+      {
+        "from": "TRIAGE", "to": "COVERAGE_CHECK",
+        "reason": "Claim type confirmed: property fire.", "timestamp": "2024-02-11T11:00:00Z"
+      },
+      {
+        "from": "COVERAGE_CHECK", "to": "INVESTIGATION",
+        "reason": "Coverage confirmed. No exclusions found.", "timestamp": "2024-02-12T09:00:00Z"
+      },
+      {
+        "from": "INVESTIGATION", "to": "FRAUD_REVIEW",
+        "reason": "Fraud score 0.82: claim filed 16 days after policy inception; amount 2.4x typical.",
+        "timestamp": "2024-02-12T14:00:00Z"
+      }
+    ],
+    "document_requests": [
+      {
+        "document_type": "Fire brigade report",
+        "reason": "Independent verification of fire incident required",
+        "requested_at": "2024-02-12T14:30:00Z",
+        "status": "pending"
+      }
+    ]
+  },
+  "CLM-2024-004": {
+    "claim_id": "CLM-2024-004",
+    "policy_number": "POL-HEALTH-004",
+    "claim_type": "health",
+    "status": "CLOSED",
+    "claimed_amount": 45000,
+    "incident_date": "2024-01-08",
+    "policy_start_date": "2022-04-01",
+    "incident_description": "OPD consultation and diagnostic tests for diabetes management.",
+    "hitl_required": false,
+    "fraud_score": 0.05,
+    "settlement_amount": 42000,
+    "policy_citations": [
+      "[health_policy: OPD Coverage > Section 4.2]",
+      "[health_policy: Diabetes Management > Section 7.1]"
+    ],
+    "audit_trail": [
+      {
+        "from": "INTAKE", "to": "TRIAGE",
+        "reason": "Clean claim, routine OPD.", "timestamp": "2024-01-09T09:00:00Z"
+      },
+      {
+        "from": "TRIAGE", "to": "COVERAGE_CHECK",
+        "reason": "Documents verified.", "timestamp": "2024-01-09T10:00:00Z"
+      },
+      {
+        "from": "COVERAGE_CHECK", "to": "INVESTIGATION",
+        "reason": "Coverage confirmed per Section 4.2.", "timestamp": "2024-01-09T11:00:00Z"
+      },
+      {
+        "from": "INVESTIGATION", "to": "DECISION",
+        "reason": "No fraud flags. Settlement at 93% of claim (deductible applied).",
+        "timestamp": "2024-01-10T09:00:00Z"
+      },
+      {
+        "from": "DECISION", "to": "CLOSED",
+        "reason": "Settlement Rs 42,000 approved and disbursed.", "timestamp": "2024-01-10T11:00:00Z"
+      }
+    ],
+    "document_requests": []
+  },
+  "CLM-2024-005": {
+    "claim_id": "CLM-2024-005",
+    "policy_number": "POL-MOTOR-005",
+    "claim_type": "motor",
+    "status": "COVERAGE_CHECK",
+    "claimed_amount": 320000,
+    "incident_date": "2024-03-28",
+    "policy_start_date": "2023-10-01",
+    "incident_description": "Vehicle theft from parking lot. FIR filed. Total loss.",
+    "hitl_required": false,
+    "fraud_score": null,
+    "policy_citations": [],
+    "audit_trail": [
+      {
+        "from": "INTAKE", "to": "TRIAGE",
+        "reason": "FIR copy received.", "timestamp": "2024-03-29T09:00:00Z"
+      },
+      {
+        "from": "TRIAGE", "to": "COVERAGE_CHECK",
+        "reason": "Claim type: motor theft. Checking coverage.", "timestamp": "2024-03-29T10:00:00Z"
+      }
+    ],
+    "document_requests": []
+  }
+}
