@@ -1,0 +1,158 @@
+openapi: "3.1.0"
+info:
+  title: Insurance Claims Resolution API
+  description: AI-powered insurance claims processing with mandatory HITL gates
+  version: "0.1.0"
+  contact:
+    name: Claims Engineering Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://claims-api-{project}.run.app
+    description: Cloud Run (production — available Week 10)
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: health_check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  environment:
+                    type: string
+                  gcp_ready:
+                    type: boolean
+                  version:
+                    type: string
+
+  /claims/{claim_id}/status:
+    get:
+      summary: Get claim status (non-PII fields only)
+      operationId: get_claim_status
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: CLM-2024-001
+      responses:
+        "200":
+          description: Claim status returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimStatus"
+        "404":
+          description: Claim not found
+
+  /claims/{claim_id}/process:
+    post:
+      summary: Submit a query to the claims agent
+      operationId: process_claim
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimQuery"
+      responses:
+        "200":
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimResponse"
+
+  /claims/{claim_id}/stream:
+    get:
+      summary: SSE stream of agent reasoning steps
+      description: |
+        Server-Sent Events stream. Events include:
+        - connected: stream established
+        - thought: agent reasoning step
+        - tool_call: tool being invoked
+        - tool_result: tool output
+        - hitl_gate: HITL gate triggered (requires human action)
+        - completed: agent finished
+      operationId: stream_claim
+      parameters:
+        - name: claim_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  schemas:
+    ClaimStatus:
+      type: object
+      properties:
+        claim_id:
+          type: string
+        status:
+          type: string
+          enum: [INTAKE, TRIAGE, COVERAGE_CHECK, CONFLICT_REVIEW,
+                 INVESTIGATION, FRAUD_REVIEW, DECISION, APPROVAL, CLOSED]
+        claim_type:
+          type: string
+          enum: [motor, health, property]
+        claimed_amount:
+          type: number
+        incident_date:
+          type: string
+          format: date
+        hitl_required:
+          type: boolean
+        fraud_score:
+          type: number
+          nullable: true
+
+    ClaimQuery:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: Natural language instruction for the agent
+          example: "Check coverage for rear-end collision damage and advance to investigation."
+        session_id:
+          type: string
+          nullable: true
+
+    ClaimResponse:
+      type: object
+      properties:
+        claim_id:
+          type: string
+        agent_response:
+          type: string
+        status:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            type: object
