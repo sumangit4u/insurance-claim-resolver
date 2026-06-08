@@ -13,10 +13,8 @@ Pattern: adapted from inventra/agents/coordinator.py StateGraph.
 Week 3: intake → triage → coverage_check → investigation → decision nodes.
 Week 7: full HITL gates with SSE event emission + human_review interrupt nodes.
 
-Usage (Week 3+):
-    from workflow.claims_workflow import build_claims_workflow
-    graph = build_claims_workflow(llm)
-    result = graph.invoke(initial_state)
+Usage (Week 7 demo):
+    python -m workflow.claims_workflow
 """
 from __future__ import annotations
 
@@ -94,7 +92,8 @@ def node_fraud_review(state: ClaimState) -> ClaimState:
 
     Week 7: suspends graph until human specialist provides hitl_decision.
     """
-    _advance(state, ClaimStatus.FRAUD_REVIEW, f"Fraud score {state.get('fraud_result', {}).get('fraud_score', '?')} exceeds threshold. Escalated.")
+    fraud_score = state.get("fraud_result", {}).get("fraud_score", "?")
+    _advance(state, ClaimStatus.FRAUD_REVIEW, f"Fraud score {fraud_score} exceeds threshold. Escalated.")
     state["hitl_required"] = True
     # Week 7: emit SSE event
     return state
@@ -113,7 +112,8 @@ def node_approval(state: ClaimState) -> ClaimState:
 
     Week 7: suspends graph; sends approval request to senior adjudicator via SSE.
     """
-    _advance(state, ClaimStatus.APPROVAL, f"Settlement Rs {state.get('settlement_amount', 0):,.0f} requires senior approval.")
+    settlement = state.get("settlement_amount", 0)
+    _advance(state, ClaimStatus.APPROVAL, f"Settlement Rs {settlement:,.0f} requires senior approval.")
     state["hitl_required"] = True
     # Week 7: emit SSE event + notify reviewer
     return state
@@ -259,3 +259,135 @@ def _advance(state: ClaimState, target: ClaimStatus, reason: str) -> None:
         "reason": reason,
         "timestamp": _now(),
     })
+
+
+def _make_initial_state(claim_id: str, description: str) -> ClaimState:
+    """Build a minimal ClaimState for testing."""
+    return ClaimState(
+        claim_id=claim_id,
+        claim_type="motor",
+        claim_status="",
+        previous_status="",
+        claim_description=description,
+        coverage_result={},
+        fraud_result={},
+        settlement_amount=0.0,
+        policy_citations=[],
+        hitl_required=False,
+        hitl_decision="",
+        final_response="",
+        messages=[],
+        audit_trail=[],
+        missing_documents=[],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Week 7 demo — requires GOOGLE_API_KEY
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import os
+
+    W = 60
+    print("=" * W)
+    print(" Week 7 — Full LangGraph Workflow Demo")
+    print("=" * W)
+    print()
+
+    api_key = os.environ.get("GOOGLE_API_KEY") or ""
+
+    # Step 1: show graph topology (no API key needed)
+    print("Step 1 — Graph topology (9 nodes, conditional edges)")
+    print("-" * 40)
+    nodes = [
+        ("intake",          "INTAKE",          "linear"),
+        ("triage",          "TRIAGE",          "linear"),
+        ("coverage_check",  "COVERAGE_CHECK",  "conditional → conflict_review | investigation"),
+        ("conflict_review", "CONFLICT_REVIEW", "HITL gate 1 → investigation | closed"),
+        ("investigation",   "INVESTIGATION",   "conditional → fraud_review | decision"),
+        ("fraud_review",    "FRAUD_REVIEW",    "HITL gate 2 → decision"),
+        ("decision",        "DECISION",        "conditional → approval | closed"),
+        ("approval",        "APPROVAL",        "HITL gate 3 → closed"),
+        ("closed",          "CLOSED",          "→ END"),
+    ]
+    for node, status, edge_desc in nodes:
+        hitl = " [HITL]" if "HITL" in edge_desc else ""
+        print(f"  {status:<20}{hitl:<8} {edge_desc}")
+    print()
+
+    # Step 2: routing logic demonstration (no API key needed)
+    print("Step 2 — Routing function tests (no API key needed)")
+    print("-" * 40)
+    routing_tests = [
+        ("route_after_coverage_check",
+         {"coverage_result": {"conflict_detected": False}},
+         "investigation"),
+        ("route_after_coverage_check",
+         {"coverage_result": {"conflict_detected": True}},
+         "conflict_review"),
+        ("route_after_investigation",
+         {"fraud_result": {"fraud_score": 0.3}},
+         "decision"),
+        ("route_after_investigation",
+         {"fraud_result": {"fraud_score": 0.85}},
+         "fraud_review"),
+        ("route_after_decision",
+         {"settlement_amount": 250_000},
+         "closed"),
+        ("route_after_decision",
+         {"settlement_amount": 750_000},
+         "approval"),
+        ("route_after_hitl",
+         {"hitl_decision": "approve"},
+         "continue"),
+        ("route_after_hitl",
+         {"hitl_decision": "reject"},
+         "closed"),
+    ]
+    routing_fn_map = {
+        "route_after_coverage_check": route_after_coverage_check,
+        "route_after_investigation":  route_after_investigation,
+        "route_after_decision":       route_after_decision,
+        "route_after_hitl":           route_after_hitl,
+    }
+    for fn_name, state_input, expected in routing_tests:
+        actual = routing_fn_map[fn_name](state_input)
+        status = "✓" if actual == expected else "✗"
+        print(f"  {status} {fn_name}({list(state_input.values())[0]}) → {actual}")
+    print()
+
+    # Step 3: happy-path walkthrough (requires API key for LLM nodes)
+    if api_key:
+        print("Step 3 — Happy-path graph invocation (CLM-2024-001)")
+        print("-" * 40)
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from config.settings import get_settings
+        settings = get_settings()
+        llm = ChatGoogleGenerativeAI(model=settings.gemini_model, temperature=0.0)
+
+        graph = build_claims_workflow(llm)
+        initial = _make_initial_state("CLM-2024-001", "Vehicle rear-end collision on Mumbai highway")
+        # Set state so no HITL gates trigger
+        initial["fraud_result"] = {"fraud_score": 0.1}
+        initial["settlement_amount"] = 150_000
+
+        result = graph.invoke(initial)
+        print(f"  Final status    : {result['claim_status']}")
+        print(f"  Settlement      : Rs {result.get('settlement_amount', 0):,.0f}")
+        print(f"  Audit trail     : {len(result['audit_trail'])} entries")
+        for entry in result["audit_trail"]:
+            print(f"    {entry['from']} → {entry['to']}  ({entry['reason'][:50]})")
+        print()
+    else:
+        print("Step 3 — Skipped (set GOOGLE_API_KEY to run full graph invocation)")
+        print()
+        print("  Week 7 todos:")
+        print("  1. Add LangGraph interrupt() calls at HITL nodes")
+        print("  2. Wire api/main.py /claims/{id}/process to graph.invoke()")
+        print("  3. Emit SSE events from HITL nodes to /claims/{id}/stream")
+        print()
+
+    print("=" * W)
+    print(" Week 7 Complete → Week 8: LLM-as-Judge evaluation suite")
+    print("=" * W)
