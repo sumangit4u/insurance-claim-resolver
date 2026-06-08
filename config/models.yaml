@@ -1,0 +1,38 @@
+# Model registry — maps logical role to Gemini model config.
+# Loaded at runtime; override individual entries via environment variables.
+
+models:
+  claims_agent:
+    model: gemini-2.5-flash
+    temperature: 0.1
+    description: Main ReAct agent for claim processing
+
+  document_parser:
+    model: gemini-2.5-flash
+    temperature: 0.0
+    description: Extracts structured data from claim documents
+
+  fast_judge:
+    model: gemini-2.5-flash
+    temperature: 0.0
+    description: High-throughput LLM-as-Judge (coverage, hallucination)
+
+  calibration_judge:
+    model: gemini-2.5-pro
+    temperature: 0.0
+    description: High-accuracy judge for Cohen kappa calibration runs
+
+  communication_agent:
+    model: gemini-2.5-flash
+    temperature: 0.3
+    description: Drafts claimant-facing communication (slight creativity)
+
+  fraud_agent:
+    model: gemini-2.5-flash
+    temperature: 0.0
+    description: Deterministic fraud pattern detection
+
+embeddings:
+  primary:
+    model: models/gemini-embedding-001
+    description: Default embedding model (same as rag_utils.py teaching code)
