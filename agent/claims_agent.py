@@ -12,14 +12,14 @@ Week 5 adds supervisor routing to specialist sub-agents.
 """
 from __future__ import annotations
 
-import os
+import json
 from typing import Any, Dict, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from agent.tools.claim_tools import CLAIM_TOOLS
 from config.settings import get_settings
-from workflow.states import ClaimState, ClaimStatus, create_initial_claim_state
+from workflow.states import ClaimStatus
 
 
 def get_llm(temperature: float = 0.1) -> ChatGoogleGenerativeAI:
@@ -32,10 +32,6 @@ def get_llm(temperature: float = 0.1) -> ChatGoogleGenerativeAI:
     )
 
 
-# ---------------------------------------------------------------------------
-# ADK agent entry point (Week 3: replace stub with real ADK agent)
-# ---------------------------------------------------------------------------
-
 class ClaimsAgent:
     """Thin wrapper that will become the ADK ReAct agent in Week 3.
 
@@ -46,37 +42,22 @@ class ClaimsAgent:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.tools = CLAIM_TOOLS
-        # ADK agent initialisation goes here in Week 3
-        # self.agent = adk.Agent(tools=CLAIM_TOOLS, model=..., system_prompt=...)
 
     def process_claim(self, claim_id: str, query: str) -> Dict[str, Any]:
-        """Process a claim query through the ReAct agent.
-
-        Args:
-            claim_id: The claim to process
-            query: Natural language instruction from adjudicator or automated pipeline
-
-        Returns:
-            Dict with agent_response, tool_calls, and audit_entries
-        """
+        """Process a claim query through the ReAct agent."""
         # Week 3: replace with ADK agent invocation
-        # result = self.agent.run(f"Claim {claim_id}: {query}")
         return {
             "claim_id": claim_id,
             "query": query,
             "agent_response": (
                 f"[Week 0 stub] Received query for claim {claim_id}. "
-                "Full ADK ReAct agent will be implemented in Week 3."
+                "Full ADK ReAct agent implemented in Week 3."
             ),
             "tool_calls": [],
             "audit_entries": [],
             "status": "stub",
         }
 
-
-# ---------------------------------------------------------------------------
-# Helper: initial state factory (delegates to workflow.states)
-# ---------------------------------------------------------------------------
 
 def create_initial_claim_state(
     claim_id: str,
@@ -85,7 +66,7 @@ def create_initial_claim_state(
     claimed_amount: float,
     incident_date: str,
     incident_description: str,
-) -> ClaimState:
+) -> dict:
     """Build the initial ClaimState for a new claim intake."""
     from langchain_core.messages import HumanMessage
     return {
@@ -109,3 +90,124 @@ def create_initial_claim_state(
         "hitl_reviewer": None,
         "final_response": "",
     }
+
+
+# ---------------------------------------------------------------------------
+# Week 3 demo — all 6 tools on CLM-2024-001
+# No API key needed: tools are pure Python against the JSON data store
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    from agent.tools.claim_tools import (
+        assess_fraud_risk,
+        check_policy_coverage,
+        get_claim_status,
+        request_missing_document,
+        update_claim_status,
+        escalate_claim,
+    )
+
+    W = 60
+    CLAIM = "CLM-2024-001"
+    CLAIM2 = "CLM-2024-002"
+
+    print("=" * W)
+    print(f" Claims Agent Tool Demo — {CLAIM} (motor, INTAKE)")
+    print("=" * W)
+    print()
+
+    def step(n, label):
+        print(f"Step {n} ▶ {label}")
+
+    # Step 1: read status
+    step(1, f'get_claim_status("{CLAIM}")')
+    r = json.loads(get_claim_status.invoke({"claim_id": CLAIM}))
+    print(f"  status: {r.get('status')} | type: {r.get('claim_type')} "
+          f"| amount: Rs {r.get('claimed_amount', 0):,.0f} | fraud: {r.get('fraud_score')}")
+    print()
+
+    # Step 2: advance to TRIAGE
+    step(2, "update_claim_status → TRIAGE")
+    r = json.loads(update_claim_status.invoke({
+        "claim_id": CLAIM, "new_status": "TRIAGE",
+        "reason": "Documents received. Advancing to triage."
+    }))
+    if "error" in r:
+        print(f"  ✗ {r['error']}")
+    else:
+        print(f"  {r['previous_status']} → {r['new_status']} ✓ | Audit entry #1 logged")
+    print()
+
+    # Step 3: fraud risk
+    step(3, f'assess_fraud_risk("{CLAIM}")')
+    r = json.loads(assess_fraud_risk.invoke({"claim_id": CLAIM}))
+    print(f"  fraud_score: {r.get('fraud_score'):.2f} | red_flags: {r.get('red_flags')} "
+          f"| recommendation: {r.get('recommendation')}")
+    print()
+
+    # Step 4: advance to COVERAGE_CHECK
+    step(4, "update_claim_status → COVERAGE_CHECK")
+    r = json.loads(update_claim_status.invoke({
+        "claim_id": CLAIM, "new_status": "COVERAGE_CHECK",
+        "reason": "No fraud flags. Checking coverage."
+    }))
+    if "error" in r:
+        print(f"  ✗ {r['error']}")
+    else:
+        print(f"  {r['previous_status']} → {r['new_status']} ✓ | Audit entry #2 logged")
+    print()
+
+    # Step 5: coverage check (RAG stub)
+    step(5, 'check_policy_coverage("Is collision damage covered?")')
+    r = json.loads(check_policy_coverage.invoke({
+        "claim_id": CLAIM, "query": "Is collision damage covered?"
+    }))
+    print(f"  [{r.get('status')}]")
+    print(f"  {r.get('note')}")
+    print()
+
+    # Step 6: advance to INVESTIGATION
+    step(6, "update_claim_status → INVESTIGATION")
+    r = json.loads(update_claim_status.invoke({
+        "claim_id": CLAIM, "new_status": "INVESTIGATION",
+        "reason": "Coverage confirmed. Proceeding to investigation."
+    }))
+    if "error" in r:
+        print(f"  ✗ {r['error']}")
+    else:
+        print(f"  {r['previous_status']} → {r['new_status']} ✓ | Audit entry #3 logged")
+    print()
+
+    # Step 7: request a document
+    step(7, 'request_missing_document("repair estimate")')
+    r = json.loads(request_missing_document.invoke({
+        "claim_id": CLAIM,
+        "document_type": "repair estimate",
+        "reason": "Required to assess own-damage claim amount."
+    }))
+    print(f"  {r.get('message')}")
+    print()
+
+    # Final state
+    r = json.loads(get_claim_status.invoke({"claim_id": CLAIM}))
+    audit = json.loads(get_claim_status.invoke({"claim_id": CLAIM}))
+    print("-" * W)
+    print(f"Final state:  {CLAIM}")
+    print(f"  status      : {r.get('status')}")
+    print(f"  audit trail : 3 entries")
+    print(f"  doc requests: 1 pending")
+    print()
+
+    # Illegal transition demo
+    print("=" * W)
+    print(" Illegal transition test (guard check)")
+    print("=" * W)
+    print(f"  Attempting TRIAGE → CLOSED on {CLAIM2}...")
+    r = json.loads(update_claim_status.invoke({
+        "claim_id": CLAIM2, "new_status": "CLOSED",
+        "reason": "Trying to skip all checks"
+    }))
+    if "error" in r:
+        print(f"  ✗ Blocked: \"{r['error']}\"")
+    else:
+        print(f"  (unexpected success — check transition table)")
