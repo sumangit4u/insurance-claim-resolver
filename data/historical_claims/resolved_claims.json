@@ -1,0 +1,63 @@
+[
+  {
+    "case_id": "HIST-001",
+    "claim_type": "motor",
+    "incident": "Rear-end collision at traffic signal. Airbags deployed. Significant chassis damage.",
+    "claimed_amount": 420000,
+    "settlement_amount": 385000,
+    "resolution": "approved",
+    "resolution_reason": "Per Section 2.1 (collision cover): damage confirmed by independent surveyor. Depreciation of 8% applied per Section 4.2 for 2-year-old vehicle. Compulsory deductible Rs 2,000 applied.",
+    "policy_citations": ["motor_policy Section 2.1", "motor_policy Section 4.2", "motor_policy Section 4.3"],
+    "days_to_resolution": 12,
+    "hitl_gates_triggered": []
+  },
+  {
+    "case_id": "HIST-002",
+    "claim_type": "health",
+    "incident": "Emergency appendectomy. 2 days ICU, 3 days general ward. Total bill Rs 1,12,000.",
+    "claimed_amount": 112000,
+    "settlement_amount": 108500,
+    "resolution": "approved",
+    "resolution_reason": "Per Section 2.1 (in-patient hospitalisation): emergency surgery covered in full. Room rent within limit (ICU 2% of Sum Insured). Pre-auth approved within 2 hours per Section 6.1. Deductible Rs 3,500 applied.",
+    "policy_citations": ["health_policy Section 2.1", "health_policy Section 6.1"],
+    "days_to_resolution": 5,
+    "hitl_gates_triggered": []
+  },
+  {
+    "case_id": "HIST-003",
+    "claim_type": "property",
+    "incident": "Flood inundation of ground floor retail store. Stock and fixtures damaged.",
+    "claimed_amount": 850000,
+    "settlement_amount": 612000,
+    "resolution": "approved_partial",
+    "resolution_reason": "Per Section 2.1 (flood cover): peril confirmed by meteorological report. Underinsurance clause applied per Section 4.2: Sum Insured Rs 10L vs actual value Rs 14L → settlement ratio 71.4%. Stock loss of Rs 6L settled at Rs 4.28L; fixtures Rs 2.5L settled at Rs 1.78L (depreciation applied per Section 4.3).",
+    "policy_citations": ["property_policy Section 2.1", "property_policy Section 4.2", "property_policy Section 4.3"],
+    "days_to_resolution": 21,
+    "hitl_gates_triggered": ["APPROVAL"]
+  },
+  {
+    "case_id": "HIST-004",
+    "claim_type": "motor",
+    "incident": "Vehicle theft. FIR filed. Non-traceable certificate obtained after 92 days.",
+    "claimed_amount": 680000,
+    "settlement_amount": 680000,
+    "resolution": "approved",
+    "resolution_reason": "Per Section 5.2 (theft settlement at IDV): all required documents submitted — FIR, non-traceable certificate, all keys. IDV confirmed Rs 6,80,000. No depreciation on theft. RC transferred to insurer.",
+    "policy_citations": ["motor_policy Section 5.1", "motor_policy Section 5.2"],
+    "days_to_resolution": 97,
+    "hitl_gates_triggered": []
+  },
+  {
+    "case_id": "HIST-005",
+    "claim_type": "health",
+    "incident": "Cataract surgery on both eyes. Day care procedure.",
+    "claimed_amount": 65000,
+    "settlement_amount": 0,
+    "resolution": "rejected",
+    "resolution_reason": "Per Section 3.1 (2-year waiting period): cataract is a listed specific disease subject to 2-year waiting period. Policy tenure at time of claim: 18 months. Claim rejected. IRDAI guidelines confirmed this is a standard exclusion.",
+    "policy_citations": ["health_policy Section 3.1"],
+    "days_to_resolution": 7,
+    "hitl_gates_triggered": [],
+    "rejection_upheld_by_ombudsman": false
+  }
+]
