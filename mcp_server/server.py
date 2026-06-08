@@ -12,18 +12,17 @@ Roles (Week 4 full implementation):
     auditor      — read-only
 
 Usage:
-    python mcp_server/server.py
-    (or via ADK tool integration in Week 4)
+    python mcp_server/server.py          # start MCP stdio server
+    python mcp_server/server.py --test   # Week 4 demo: test all 6 tools directly
 """
 from __future__ import annotations
 
 import asyncio
 import json
-import os
+import sys
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
@@ -106,12 +105,12 @@ TOOLS = [
 
 # Tool → minimum required role
 _TOOL_ROLES: dict[str, str] = {
-    "get_claim_status": "adjudicator",
-    "update_claim_status": "adjudicator",
-    "escalate_claim": "adjudicator",
+    "get_claim_status":       "adjudicator",
+    "update_claim_status":    "adjudicator",
+    "escalate_claim":         "adjudicator",
     "request_missing_document": "adjudicator",
-    "check_policy_coverage": "auditor",   # read-only, lowest privilege
-    "assess_fraud_risk": "adjudicator",
+    "check_policy_coverage":  "auditor",    # read-only, lowest privilege
+    "assess_fraud_risk":      "adjudicator",
 }
 
 _ROLE_HIERARCHY = {"auditor": 0, "adjudicator": 1, "supervisor": 2}
@@ -119,7 +118,7 @@ _ROLE_HIERARCHY = {"auditor": 0, "adjudicator": 1, "supervisor": 2}
 
 def _check_rbac(tool_name: str, caller_role: str) -> bool:
     """Return True if caller_role is sufficient for tool_name."""
-    required = _ROLE_ROLES.get(tool_name, "supervisor")
+    required = _TOOL_ROLES.get(tool_name, "supervisor")   # fixed: was _ROLE_ROLES
     return _ROLE_HIERARCHY.get(caller_role, -1) >= _ROLE_HIERARCHY.get(required, 99)
 
 
@@ -143,24 +142,30 @@ class InsuranceMCPServer:
         async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             # RBAC check (Week 4: extract caller role from session context)
             caller_role = arguments.pop("_caller_role", "adjudicator")
+            if not _check_rbac(name, caller_role):
+                return [TextContent(
+                    type="text",
+                    text=json.dumps({
+                        "error": "RBAC_DENIED",
+                        "tool": name,
+                        "caller_role": caller_role,
+                        "required_role": _TOOL_ROLES.get(name, "supervisor"),
+                    })
+                )]
 
-            # Audit entry
             audit_entry = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "tool": name,
                 "caller_role": caller_role,
                 "args": {k: v for k, v in arguments.items() if "pii" not in k.lower()},
             }
-
             result = await self._dispatch(name, arguments)
             audit_entry["result_preview"] = str(result)[:200]
             self._audit_log.append(audit_entry)
-
             return result
 
     async def _dispatch(self, name: str, args: dict) -> list[TextContent]:
         """Route tool call to the appropriate handler."""
-        # Import LangChain tools and invoke them (sync tools wrapped in asyncio)
         from agent.tools.claim_tools import (
             assess_fraud_risk,
             check_policy_coverage,
@@ -171,12 +176,12 @@ class InsuranceMCPServer:
         )
 
         dispatch_map = {
-            "get_claim_status": get_claim_status,
-            "update_claim_status": update_claim_status,
-            "escalate_claim": escalate_claim,
+            "get_claim_status":        get_claim_status,
+            "update_claim_status":     update_claim_status,
+            "escalate_claim":          escalate_claim,
             "request_missing_document": request_missing_document,
-            "check_policy_coverage": check_policy_coverage,
-            "assess_fraud_risk": assess_fraud_risk,
+            "check_policy_coverage":   check_policy_coverage,
+            "assess_fraud_risk":       assess_fraud_risk,
         }
 
         tool_fn = dispatch_map.get(name)
@@ -197,12 +202,109 @@ class InsuranceMCPServer:
             )
 
 
-async def main() -> None:
-    print("Insurance Claims MCP Server")
+# ---------------------------------------------------------------------------
+# Week 4 --test mode demo (no MCP client needed)
+# ---------------------------------------------------------------------------
+
+def _run_test_mode() -> None:
+    """Call all 6 tools directly via LangChain — no MCP protocol required.
+
+    Run with:  python mcp_server/server.py --test
+    """
+    from agent.tools.claim_tools import (
+        assess_fraud_risk,
+        check_policy_coverage,
+        escalate_claim,
+        get_claim_status,
+        request_missing_document,
+        update_claim_status,
+    )
+
+    W = 60
+    print("=" * W)
+    print(" Week 4 — MCP Server Test Mode")
+    print("=" * W)
+    print()
+
+    # RBAC table
+    print("RBAC Configuration")
+    print("-" * 40)
+    print(f"  {'Tool':<30} {'Min Role':<15} {'Hierarchy'}")
+    print(f"  {'-'*28} {'-'*13} {'-'*10}")
+    for tool_name, min_role in _TOOL_ROLES.items():
+        level = _ROLE_HIERARCHY[min_role]
+        print(f"  {tool_name:<30} {min_role:<15} level={level}")
+    print()
+
+    # RBAC checks
+    print("RBAC Checks")
+    print("-" * 40)
+    checks = [
+        ("get_claim_status",    "auditor",     True),
+        ("escalate_claim",      "auditor",     False),
+        ("assess_fraud_risk",   "adjudicator", True),
+        ("update_claim_status", "supervisor",  True),
+    ]
+    for tool, role, expected in checks:
+        result = _check_rbac(tool, role)
+        status = "✓ PASS" if result == expected else "✗ FAIL"
+        verdict = "ALLOWED" if result else "DENIED"
+        print(f"  {status}  {role:<15} → {tool:<28} {verdict}")
+    print()
+
+    # Live tool calls
+    print("Live Tool Calls (claim CLM-2024-001)")
+    print("-" * 40)
+    test_calls = [
+        ("get_claim_status",        {"claim_id": "CLM-2024-001"}),
+        ("request_missing_document", {"claim_id": "CLM-2024-001",
+                                      "document_type": "Police FIR",
+                                      "reason": "Required for motor accident claims"}),
+        ("assess_fraud_risk",       {"claim_id": "CLM-2024-001"}),
+        ("escalate_claim",          {"claim_id": "CLM-2024-001",
+                                     "gate": "FRAUD_REVIEW",
+                                     "reason": "High fraud score detected"}),
+        ("check_policy_coverage",   {"claim_id": "CLM-2024-001",
+                                     "query": "Is collision damage covered?"}),
+        ("update_claim_status",     {"claim_id": "CLM-2024-001",
+                                     "new_status": "INVESTIGATION",
+                                     "reason": "Triage complete"}),
+    ]
+
+    tool_map = {
+        "get_claim_status":        get_claim_status,
+        "request_missing_document": request_missing_document,
+        "assess_fraud_risk":       assess_fraud_risk,
+        "escalate_claim":          escalate_claim,
+        "check_policy_coverage":   check_policy_coverage,
+        "update_claim_status":     update_claim_status,
+    }
+
+    for tool_name, args in test_calls:
+        print(f"  → {tool_name}({', '.join(f'{k}={v!r}' for k, v in args.items() if k == 'claim_id' or len(str(v)) < 30)})")
+        try:
+            output = tool_map[tool_name].invoke(args)
+            # Print first 120 chars of output
+            preview = output[:120] + ("..." if len(output) > 120 else "")
+            print(f"     {preview}")
+        except Exception as e:
+            print(f"     ERROR: {e}")
+        print()
+
+    print("=" * W)
+    print(" Week 4 Complete → Week 5: Multi-agent supervisor")
+    print("=" * W)
+
+
+async def _run_server() -> None:
+    print("Insurance Claims MCP Server — stdio mode")
     print("Tools:", [t.name for t in TOOLS])
     server = InsuranceMCPServer()
     await server.run()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if "--test" in sys.argv:
+        _run_test_mode()
+    else:
+        asyncio.run(_run_server())
