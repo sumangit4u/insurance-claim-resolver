@@ -1,0 +1,48 @@
+# Core agent framework
+google-adk>=0.5.0
+
+# LangChain ecosystem (teaching-code patterns reused)
+langchain-google-genai>=2.0.0
+langchain-core>=0.3.0
+langchain-text-splitters>=0.3.0
+langchain-chroma>=0.1.0
+chromadb>=0.5.0
+langgraph>=0.2.0
+langchain>=0.3.0
+
+# MCP (same library as session8_mcp teaching code)
+mcp>=1.0.0
+httpx>=0.27.0
+
+# API
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+sse-starlette>=2.1.0
+
+# Data / config
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.0
+
+# Evaluation
+ragas>=0.2.0
+
+# Observability
+opentelemetry-api>=1.28.0
+opentelemetry-sdk>=1.28.0
+
+# Testing
+pytest>=8.3.0
+pytest-asyncio>=0.24.0
+pytest-mock>=3.14.0
+
+# Code quality
+ruff>=0.8.0
+mypy>=1.13.0
+
+# GCP packages — commented out until account is ready
+# google-cloud-firestore>=2.19.0
+# google-cloud-secret-manager>=2.22.0
+# google-cloud-trace>=1.13.0
+# google-cloud-aiplatform>=1.71.0
