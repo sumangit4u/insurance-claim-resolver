@@ -1,11 +1,11 @@
 """5 Domain LLM-as-Judge Evaluators — Week 8 deliverable.
 
 Judges (calibrated to Cohen's kappa >= 0.60 against human labels):
-    1. CoverageAccuracyJudge   — did the agent correctly determine coverage?
-    2. CitationQualityJudge    — are policy citations verbatim and relevant?
+    1. CoverageAccuracyJudge      — did the agent correctly determine coverage?
+    2. CitationQualityJudge       — are policy citations verbatim and relevant?
     3. EscalationCorrectnessJudge — were HITL gates triggered at the right time?
-    4. CompletenessJudge       — does the response address all aspects of the claim?
-    5. SafetyJudge             — does the response contain PII or harmful content?
+    4. CompletenessJudge          — does the response address all aspects of the claim?
+    5. SafetyJudge                — does the response contain PII or harmful content?
 
 Each judge:
     - Uses the same Pydantic schema pattern as rag_utils.RetrievalGrade
@@ -21,9 +21,13 @@ Week 8 deliverables built on top of this skeleton:
     - calibration_run(): compute Cohen's kappa vs human labels
     - batch_evaluate(): run all 5 judges over a dataset
     - ragas_suite(): combined RAGAS + domain judge evaluation
+
+Usage (Week 8 demo):
+    python -m evaluation.judges
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Literal
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -194,7 +198,7 @@ class EscalationCorrectnessJudge(BaseJudge):
         claim_state: Dict[str, Any],
         escalation_events: List[Dict[str, Any]],
     ) -> EscalationVerdict:
-        """Week 8: rule-based check with LLM for ambiguous conflict cases."""
+        """Rule-based check with LLM for ambiguous conflict cases (Week 8)."""
         fraud_score = claim_state.get("fraud_result", {}).get("fraud_score", 0)
         settlement = claim_state.get("settlement_amount", 0)
         conflict = claim_state.get("coverage_result", {}).get("conflict_detected", False)
@@ -203,14 +207,13 @@ class EscalationCorrectnessJudge(BaseJudge):
         should_escalate_approval = settlement > 500_000
         did_escalate = len(escalation_events) > 0
 
-        # Simple rule check (Week 8: LLM handles ambiguous conflict detection)
         should_have_escalated = should_escalate_fraud or should_escalate_approval or conflict
         score = 1.0 if (should_have_escalated == did_escalate) else 0.0
 
         return EscalationVerdict(
             score=score,
             passed=score >= self.PASSING_THRESHOLD,
-            reason="Rule-based check only. LLM judgment added in Week 8.",
+            reason="Rule-based check only. LLM judgment for conflict detection in Week 8.",
             confidence=0.9 if score == 1.0 else 0.5,
             should_have_escalated=should_have_escalated,
             did_escalate=did_escalate,
@@ -278,7 +281,6 @@ class SafetyJudge(BaseJudge):
 
     def evaluate(self, agent_response: str) -> SafetyVerdict:
         """Rule-based PII detection. LLM-assisted semantic check added in Week 8."""
-        import re
         pii_found = []
         for pattern in self.PII_PATTERNS:
             if re.search(pattern, agent_response):
@@ -312,3 +314,108 @@ ALL_JUDGES = [
 def run_safety_check(agent_response: str) -> SafetyVerdict:
     """Convenience: run the SafetyJudge on any response before returning it."""
     return SafetyJudge().evaluate(agent_response)
+
+
+# ---------------------------------------------------------------------------
+# Week 8 demo — SafetyJudge and EscalationJudge work now; others are stubs
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    W = 60
+    print("=" * W)
+    print(" Week 8 — LLM-as-Judge Evaluation Suite Demo")
+    print("=" * W)
+    print()
+
+    # --- Judge registry ---
+    print("Judge Registry")
+    print("-" * 40)
+    thresholds = {
+        "CoverageAccuracyJudge":      (CoverageAccuracyJudge.PASSING_THRESHOLD,      "LLM"),
+        "CitationQualityJudge":       (CitationQualityJudge.PASSING_THRESHOLD,       "LLM"),
+        "EscalationCorrectnessJudge": (EscalationCorrectnessJudge.PASSING_THRESHOLD, "rule-based + LLM"),
+        "CompletenessJudge":          (CompletenessJudge.PASSING_THRESHOLD,          "LLM"),
+        "SafetyJudge":                (SafetyJudge.PASSING_THRESHOLD,               "regex (LLM in W8)"),
+    }
+    for judge_name, (threshold, mode) in thresholds.items():
+        status = "✓ implemented" if judge_name in ("SafetyJudge", "EscalationCorrectnessJudge") else "  stub (W8)"
+        print(f"  {status}  {judge_name:<32} threshold={threshold:.2f}  [{mode}]")
+    print()
+
+    # --- SafetyJudge tests (fully implemented) ---
+    print("SafetyJudge — PII Detection Tests")
+    print("-" * 40)
+    safety_judge = SafetyJudge()
+    safety_tests = [
+        ("Clean response",
+         "Claim CLM-2024-001 has been approved. Settlement of Rs 1,50,000 will be disbursed within 7 days.",
+         True),
+        ("Contains Aadhaar number",
+         "Policy holder Aadhaar: 987654321012 — claim approved.",
+         False),
+        ("Contains PAN",
+         "PAN card ABCDE1234F verified for the claimant.",
+         False),
+        ("Contains email",
+         "Notification sent to claimant@example.com",
+         False),
+        ("Contains Indian mobile",
+         "Contact claimant at 9876543210 for further details.",
+         False),
+    ]
+    for description, response, expected_safe in safety_tests:
+        verdict = safety_judge.evaluate(response)
+        status = "✓ PASS" if verdict.passed == expected_safe else "✗ FAIL"
+        pii_info = f"PII: {verdict.pii_fields_found}" if verdict.pii_detected else "clean"
+        print(f"  {status}  {description}")
+        print(f"         {pii_info} | score={verdict.score:.1f} | confidence={verdict.confidence:.2f}")
+    print()
+
+    # --- EscalationCorrectnessJudge tests (rule-based, fully implemented) ---
+    print("EscalationCorrectnessJudge — Rule-based Tests")
+    print("-" * 40)
+    esc_judge = EscalationCorrectnessJudge()
+    escalation_tests = [
+        ("Low fraud, low settlement → no escalation needed",
+         {"fraud_result": {"fraud_score": 0.2}, "settlement_amount": 100_000, "coverage_result": {}},
+         [],
+         True),
+        ("High fraud score → escalation needed, and did escalate",
+         {"fraud_result": {"fraud_score": 0.85}, "settlement_amount": 100_000, "coverage_result": {}},
+         [{"gate": "FRAUD_REVIEW"}],
+         True),
+        ("Large settlement → escalation needed, but missed",
+         {"fraud_result": {"fraud_score": 0.1}, "settlement_amount": 750_000, "coverage_result": {}},
+         [],
+         False),
+    ]
+    for description, claim_state, events, should_pass in escalation_tests:
+        verdict = esc_judge.evaluate(claim_state, events)
+        status = "✓ PASS" if verdict.passed == should_pass else "✗ FAIL"
+        print(f"  {status}  {description}")
+        print(f"         should_escalate={verdict.should_have_escalated} | did_escalate={verdict.did_escalate} | score={verdict.score:.1f}")
+    print()
+
+    # --- Stub judges summary ---
+    print("Stub Judges (implement in Week 8)")
+    print("-" * 40)
+    stub_tests = [
+        ("CoverageAccuracyJudge",  "motor accident claim covered under own damage",  "covered"),
+        ("CitationQualityJudge",   "response cites [motor_policy: 3.2.1]",           "2 citations"),
+        ("CompletenessJudge",      "approved with settlement amount and next steps",  "all 4 aspects"),
+    ]
+    for judge_name, description, expected in stub_tests:
+        print(f"  [STUB] {judge_name}")
+        print(f"         input: {description}")
+        print(f"         expected output: {expected} → implement LLM call in Week 8")
+    print()
+
+    print("=" * W)
+    print(" Week 8 Todos")
+    print("=" * W)
+    print("  1. Implement CoverageAccuracyJudge.evaluate() with with_structured_output()")
+    print("  2. Implement CitationQualityJudge.evaluate() — regex + LLM verbatim check")
+    print("  3. Implement CompletenessJudge.evaluate() — LLM checks 4 required aspects")
+    print("  4. Run calibration_run() — measure Cohen's kappa vs 100 human labels")
+    print("  5. Wrap each judge as a RAGAS custom metric in rag/evaluate.py")
+    print("=" * W)
