@@ -1,0 +1,85 @@
+# Cloud Build pipeline — Week 10 production deployment
+# Triggered on push to main branch
+#
+# Steps:
+#   1. Run tests
+#   2. Build Docker image
+#   3. Push to Artifact Registry
+#   4. Deploy to Cloud Run
+#
+# Prerequisites (set in Cloud Build substitutions):
+#   _REGION        e.g. us-central1
+#   _SERVICE_NAME  e.g. insurance-claims-agent
+#   _REPO          e.g. claims-docker (Artifact Registry repo name)
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: insurance-claims-agent
+  _REPO: claims-docker
+  _IMAGE: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}
+
+steps:
+  # Step 1: Run tests
+  - name: python:3.11-slim
+    id: test
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        pip install -r requirements.txt --quiet
+        pytest tests/ -v --tb=short
+    env:
+      - GOOGLE_API_KEY=${_GOOGLE_API_KEY}
+      - ENVIRONMENT=test
+
+  # Step 2: Build Docker image
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - -t
+      - ${_IMAGE}:${SHORT_SHA}
+      - -t
+      - ${_IMAGE}:latest
+      - .
+    waitFor: [test]
+
+  # Step 3: Push to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    args:
+      - push
+      - --all-tags
+      - ${_IMAGE}
+    waitFor: [build]
+
+  # Step 4: Deploy to Cloud Run
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=${_IMAGE}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --memory=2Gi
+      - --cpu=2
+      - --concurrency=80
+      - --min-instances=0
+      - --max-instances=10
+      - --set-env-vars=ENVIRONMENT=production
+      - --set-secrets=GOOGLE_API_KEY=google-api-key:latest
+    waitFor: [push]
+
+images:
+  - ${_IMAGE}:${SHORT_SHA}
+  - ${_IMAGE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1200s
