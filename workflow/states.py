@@ -98,3 +98,62 @@ def can_transition(current: ClaimStatus, target: ClaimStatus) -> bool:
 def requires_hitl(status: ClaimStatus) -> bool:
     """Return True if this state requires human review before continuing."""
     return status in HITL_STATES
+
+
+# ---------------------------------------------------------------------------
+# Week 0 demo
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    W = 60
+    print("=" * W)
+    print(" Insurance Claims — 9-State Workflow (Week 0 Demo)")
+    print("=" * W)
+    print()
+    print("States (in order):")
+    print("  INTAKE → TRIAGE → COVERAGE_CHECK → [CONFLICT_REVIEW *]")
+    print("  → INVESTIGATION → [FRAUD_REVIEW *] → DECISION → [APPROVAL *] → CLOSED")
+    print("  (* = HITL gate: workflow pauses for mandatory human review)")
+    print()
+
+    print("Valid transitions:")
+    ordered = [
+        ClaimStatus.INTAKE, ClaimStatus.TRIAGE, ClaimStatus.COVERAGE_CHECK,
+        ClaimStatus.CONFLICT_REVIEW, ClaimStatus.INVESTIGATION, ClaimStatus.FRAUD_REVIEW,
+        ClaimStatus.DECISION, ClaimStatus.APPROVAL, ClaimStatus.CLOSED,
+    ]
+    for state in ordered:
+        targets = TRANSITIONS[state]
+        if targets:
+            target_str = " | ".join(t.value for t in sorted(targets, key=lambda x: x.value))
+            hitl_tag = "  [HITL gate]" if requires_hitl(state) else ""
+            print(f"  {state.value:<20} → {target_str}{hitl_tag}")
+        else:
+            print(f"  {state.value:<20} → (terminal)")
+
+    print()
+    print("Transition guard tests:")
+    tests = [
+        (ClaimStatus.INTAKE,       ClaimStatus.TRIAGE,        True,  "valid"),
+        (ClaimStatus.INTAKE,       ClaimStatus.CLOSED,         False, "BLOCKED (illegal skip)"),
+        (ClaimStatus.INVESTIGATION, ClaimStatus.FRAUD_REVIEW,  True,  "valid"),
+        (ClaimStatus.DECISION,     ClaimStatus.INTAKE,         False, "BLOCKED (no going back)"),
+    ]
+    for current, target, expected, label in tests:
+        result = can_transition(current, target)
+        icon = "✓" if result else "✗"
+        print(f"  {icon} {current.value} → {target.value:<20} {label}")
+
+    print()
+    print("ClaimState key fields:")
+    fields = [
+        ("claim_id", "str"),
+        ("claim_status", "ClaimStatus value (9 states)"),
+        ("claimed_amount", "float (Rs)"),
+        ("fraud_result", "dict — from assess_fraud_risk tool"),
+        ("policy_citations", "list[str] — every decision cited"),
+        ("audit_trail", "list[dict] — immutable transition log"),
+        ("hitl_required", "bool — True when paused for human"),
+    ]
+    for name, desc in fields:
+        print(f"  • {name:<20} {desc}")
